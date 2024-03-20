@@ -1,5 +1,6 @@
 from leitor_dados_txt import leitor_dados
 from modelos import *
+import time
 
 class Controlador:
     def __init__(self, problema, arquivo=None, num=None):
@@ -33,11 +34,19 @@ class Controlador:
         leitor = leitor_dados(problema=self.problema)
         dados = leitor.le_dados_TSP()
         if arquivo:
-            dados = dados[arquivo]
+            dados = {arquivo: dados[arquivo]}
         for instancia in dados:
+            print('-' * 90)
+            print(f'Rodando o Arquivo {instancia}')
+            print('-' * 90)
+            inicio = time.time()
             model = ModelTSP(dados=dados[instancia])
             resposta = model.otimiza()
+            fim=time.time()
+            print('-' * 90)
             print(f'{dados[instancia].name} = {resposta}')
+            print(f'Tempo de resposta: {fim - inicio}')
+            print('-' * 90)
 
 
 if __name__ == '__main__':

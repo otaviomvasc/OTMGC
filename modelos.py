@@ -3,6 +3,8 @@ from itertools import product
 import matplotlib.pyplot as plt
 from math import sqrt
 import numpy as np
+import copy
+
 
 class ModelAtribuicaoGeneralizada:
     def __init__(self, dados):
@@ -55,8 +57,8 @@ class ModelTSP:
         self.n = dados.dimension
         self.matriz_c = dados.edge_weights
 
-    def otimiza(self, subrota_TMZ=True, subrota_fluxo=True):
-        def rest_subrota_TMZ(model):
+    def otimiza(self, subrota_TMZ=False, subrota_fluxo=True, max_seconds = 3600):
+        def rest_subrota_TMZ(model, max_seconds):
             var_seq = {node: model.add_var(name=f'seq {node}', var_type=mip.INTEGER)
                        for node in range(self.n)}
 
@@ -65,9 +67,9 @@ class ModelTSP:
                     continue
                 model += var_seq[n] - var_seq[j] + self.n * var_arco[(n,j)] <= self.n - 1
 
-            status = model.optimize()
+            status = model.optimize(max_seconds=max_seconds)
 
-        def rest_subrota_fluxo(model):
+        def rest_subrota_fluxo(model, max_seconds):
             """
                 Pseudocódigo para retirada subrota por restrição de fluxo
                 Roda solve
@@ -86,16 +88,47 @@ class ModelTSP:
                         sai do while
 
             """
-            status = model.optimize()
+
             while True:
+                model.optimize(max_seconds=max_seconds)
+                #checa se há subrota:
+                pt = 0
+                rotas_totais = list()
+                rotas_aux = list()
+                while True:
+                    n_arc = next(v for v in var_arco if v[0] == pt and var_arco[v].x > 0)
+                    if n_arc[1] in [arc[0] for arc in rotas_aux]:
+                        rotas_aux.append(n_arc)
+                        rotas_totais.append(rotas_aux[:])
+                        if sum(len(sub_rotas) for sub_rotas in rotas_totais) == self.n:
+                            #todas as subrotas já foram mapeadas!
+                            rotas_aux.clear()
+                            break
+
+                        pt = next(n for n in range(self.n) if n not in [b[1] for a in rotas_totais for b in a])
+                        rotas_aux.clear()
+                        #rotas_aux.append(pt)
+                        continue
+                        # Fecha subrota!!!
+                    rotas_aux.append(n_arc)
+                    pt = copy.deepcopy(n_arc[1])
+
+                if len(rotas_totais[0]) == self.n: #Não gerou subrotas
+                    break
+
+                #Cria restrição de fluxo para cada subrota!
+                for sub_r in rotas_totais:
+                   model += mip.xsum(var_arco[p] for p in sub_r) <= len(sub_r) - 1
+
+
 
 
         model = mip.Model('TSP', mip.MINIMIZE)
         var_arco = {pr:model.add_var(name=f'arco {pr[0]} - {pr[1]}', var_type=mip.BINARY)
                     for pr in product(range(self.n), range(self.n)) if pr[0] != pr[1]}
 
-        var_seq = {node: model.add_var(name=f'seq {node}', var_type=mip.INTEGER)
-                   for node in range(self.n)}
+        # var_seq = {node: model.add_var(name=f'seq {node}', var_type=mip.INTEGER)
+        #            for node in range(self.n)}
 
         model.objective = mip.minimize(
             mip.xsum(var_arco[pr] * self.matriz_c[pr] for pr in product(range(self.n), range(self.n)) if pr[0] != pr[1])
@@ -112,11 +145,12 @@ class ModelTSP:
 
         if subrota_TMZ:
             #Restrição MTZ para retirada de sub-rota. Considerei nó 0 como origem!
-            rest_subrota_TMZ(model=model)
+            rest_subrota_TMZ(model=model, max_seconds=max_seconds)
             return model.objective_value
 
         elif subrota_fluxo:
-            rest_subrota_fluxo(model)
+            rest_subrota_fluxo(model=model, max_seconds=max_seconds)
+            return model.objective_value
 
         # for v in model.vars:
         #     if v.x > 0:
