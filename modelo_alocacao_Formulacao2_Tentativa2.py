@@ -60,69 +60,20 @@ var_atv_planta = {planta: model.add_var(var_type=mip.BINARY, name=f'atv_planta_{
 dict_teste = dict()
 z = dict()
 for cliente in distancias_d:
-    z[cliente] = [model.add_var(var_type=mip.CONTINUOUS, lb=0, name=f'planta_ate {(cliente, planta)}') for planta
+    z[cliente] = [model.add_var(var_type=mip.BINARY, name=f'planta_ate {(cliente, planta)}') for planta
                   in distancias_d[cliente]]
 
 
-model.objective = mip.minimize(
-    #Custo de ativação de planta
-    mip.xsum(var_atv_planta[pl] * c_instalacao[pl] for pl in plantas) +
-    #custo de transporte!
-    mip.xsum(
-        (m_custo[(distancias_d[cliente][0], cliente)] +
-        (
-        mip.xsum((m_custo[(distancias_d[cliente][k+1], cliente)] - m_custo[(distancias_d[cliente][k], cliente)]) * z[cliente][k]
-         for k in range(len(distancias_d[cliente])-1) if k < n_plantas)
-        )
-         ) * demanda[cliente]
-
-        for cliente in clientes
-    )
-    )
-
-
-# for cliente in clientes:
-#     model += (mip.xsum(var_atend_demanda[planta_c] for planta_c in product(plantas, [cliente])) == 1)
-
-#A planta escolhida vai zerar a variável z posição 0 daquele cliente!
-for cliente in clientes:
-    # model += (
-    #         z[cliente][0] +
-    #         mip.xsum(var_atv_planta[pl] for pl in distancias_d[cliente]) >= 1
-    # )
-    model += (z[cliente][0] + var_atv_planta[distancias_d[cliente][0]] >= 1)
-
-
-for cliente in clientes:
-    for k in plantas:
-        if k == 0:
-            continue
-        # model += (
-        #         z[cliente][k] +
-        #         mip.xsum(var_atv_planta[pl] for pl in distancias_d[cliente]) >= z[cliente][k-1]
-        # )
-        model += (z[cliente][k] + var_atv_planta[distancias_d[cliente][k]] >= z[cliente][k-1])
 
 
 #Chamadado Solver
 status = model.optimize()
-for cliente in clientes:
-    for k in range(len(distancias_d[cliente]) - 1):
-        m_custo[(distancias_d[cliente][k + 1], cliente)] - m_custo[(distancias_d[cliente][k], cliente)] * z[cliente][k].x
-
 
 list_z = list()
 for c in clientes:
     for vari in z[c]:
-        if vari.x == 0:
+        if vari.x > 0:
             list_z.append(vari)
-
-
-list_z2 = list()
-for c in clientes:
-    for vari in z[c]:
-        if vari.x == 1:
-            list_z2.append(vari)
 #Pós-Otimização!
 
 if status == mip.OptimizationStatus.OPTIMAL:
@@ -130,4 +81,23 @@ if status == mip.OptimizationStatus.OPTIMAL:
     #print(f'Custo de Transporte = {round(sum(var_atend_demanda[planta_cliente].x * demanda[planta_cliente[1]] * m_custo[planta_cliente] for planta_cliente in product(plantas, clientes)),2)}')
     print(f'Custo Total = {model.objective_value}')
 
+    fig, ax = plt.subplots()
+
+    #marcando os clientes
+    plt.scatter(pos_clientes[:, 0], pos_clientes[:, 1], marker="o", color='black', s=10, label="clientes")
+
+    for i in clientes:
+        plt.text(pos_clientes[i,0], pos_clientes[i,1], "{:d}".format(i + 1))
+
+    for (i, j) in [(i, j) for (i, j) in product(plantas, clientes) if var_atend_demanda[(i, j)].x >= 1e-6]:
+        plt.plot((pos_clientes[j][0], pos_plantas[i][0]), (pos_clientes[j][1], pos_plantas[i][1]), linestyle="--", color="black")
+
+    plt.scatter(pos_plantas[:, 0], pos_plantas[:, 1], marker="^", color='black', s=100, label="plantas")
+
+    for j in plantas:
+        plt.text(pos_plantas[j][0] + .5, pos_plantas[j][1], "{:d}".format(j+1))
+
+    plt.legend()
+    plt.plot()
+    plt.show()
 
