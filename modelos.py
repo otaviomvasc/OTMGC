@@ -57,7 +57,7 @@ class ModelTSP:
         self.n = dados.dimension
         self.matriz_c = dados.edge_weights
 
-    def otimiza(self, subrota_TMZ=False, subrota_fluxo=True, max_seconds = 3600):
+    def otimiza(self, subrota_TMZ=False, subrota_fluxo_ficticio=True, sub_rota_iterativa=False, max_seconds = 3600):
         def rest_subrota_TMZ(model, max_seconds):
             var_seq = {node: model.add_var(name=f'seq {node}', var_type=mip.INTEGER)
                        for node in range(self.n)}
@@ -69,7 +69,7 @@ class ModelTSP:
 
             status = model.optimize(max_seconds=max_seconds)
 
-        def rest_subrota_fluxo(model, max_seconds):
+        def rest_sub_rota_iterativa(model, max_seconds):
             """
                 Pseudocódigo para retirada subrota por restrição de fluxo
                 Roda solve
@@ -120,6 +120,31 @@ class ModelTSP:
                 for sub_r in rotas_totais:
                    model += mip.xsum(var_arco[p] for p in sub_r) <= len(sub_r) - 1
 
+        def rest_subrota_fluxo_ficticio(model, max_seconds):
+            #Criar variável de fluxo (i,j)
+            var_fluxo = {pr: model.add_var(name=f'fluxo {pr}', var_type=mip.INTEGER)
+                         for pr in product(range(self.n), range(self.n)) if pr[0] != pr[1]}
+
+            #restrição que garanta que o veículo saia da planta com n-1 unidades de fluxo.
+            model += (mip.xsum(var_fluxo[(0, j)] for j in range(1, self.n)) == self.n-1)
+
+
+            #Restrição de balanço de fluxo:
+            for node in range(1, self.n):
+                model += (
+                    mip.xsum(var_fluxo[(i, node)] for i in range(self.n) if i != node) - mip.xsum(var_fluxo[(node, i)] for i in range(self.n) if i != node) == 1
+                )
+
+            #Ativação do fluxo x(i,j)
+            for pr in product(range(self.n), range(self.n)):
+                if pr[0] == pr[1]:
+                    continue
+                model += (
+                    var_fluxo[pr] <= (self.n -1) * var_arco[pr]
+                )
+
+            status = model.optimize(max_seconds=max_seconds)
+
 
 
 
@@ -127,8 +152,6 @@ class ModelTSP:
         var_arco = {pr:model.add_var(name=f'arco {pr[0]} - {pr[1]}', var_type=mip.BINARY)
                     for pr in product(range(self.n), range(self.n)) if pr[0] != pr[1]}
 
-        # var_seq = {node: model.add_var(name=f'seq {node}', var_type=mip.INTEGER)
-        #            for node in range(self.n)}
 
         model.objective = mip.minimize(
             mip.xsum(var_arco[pr] * self.matriz_c[pr] for pr in product(range(self.n), range(self.n)) if pr[0] != pr[1])
@@ -148,11 +171,13 @@ class ModelTSP:
             rest_subrota_TMZ(model=model, max_seconds=max_seconds)
             return model.objective_value
 
-        elif subrota_fluxo:
-            rest_subrota_fluxo(model=model, max_seconds=max_seconds)
+        elif subrota_fluxo_ficticio:
+            rest_subrota_fluxo_ficticio(model=model, max_seconds=max_seconds)
             return model.objective_value
 
-        # for v in model.vars:
-        #     if v.x > 0:
-        #         print(f'{v.name = } and {v.x}')
+        elif sub_rota_iterativa():
+            rest_sub_rota_iterativa(model=model, max_seconds=max_seconds)
+            return model.objective_value
+
+
 
