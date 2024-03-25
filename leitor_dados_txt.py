@@ -4,6 +4,7 @@ from collections import defaultdict
 import tsplib95
 from itertools import product
 from math import sqrt
+import numpy as np
 
 """
 Classes que vão abrir arquivos txt de cada problema e retornar dados para o modelo
@@ -110,7 +111,6 @@ class leitor_dados:
 
         return dados_exportacao
 
-
     def le_dados_TSP(self):
         def formata_matriz_diagonal(pr):
             full_list_dist = [dist for _ in pr.edge_weights for dist in _]
@@ -161,9 +161,70 @@ class leitor_dados:
 
             dados[arq] = copy.deepcopy(problem)
         return dados
+
     def le_dados_alocacao_facilities(self):
-        b=0
+        lista_arquivos = os.listdir(self.path)
+        dados = dict()
+        count_l = 0
+        dict_aux = dict()
+        for arquivo in lista_arquivos:
+            with open(self.path + "\\" + arquivo, "r") as arq:
+                linha = arq.readline().split()
+                n_plantas = int(linha[0])
+                n_clientes = int(linha[1])
+                le_capacidade_custo_abr = True
+                le_demanda_cliente = False
+                le_distancia_planta_cliente = False
+
+                lista_cap = list()
+                lista_custo_abertura = list()
+                demanda_cliente = list()
+                matriz_cliente_planta_aux = list()
+                matriz_cliente_planta = list()
+
+                while True:
+                    linha = arq.readline().split()
+
+                    if le_capacidade_custo_abr:
+                        lista_cap.append(int(linha[0]))
+                        lista_custo_abertura.append(int(linha[1][0:len(linha[1]) - 1]))
+                        if len(lista_cap) == int(n_plantas):
+                            #Significa que já pegou todas as capacidades e custos de abertura
+                            le_capacidade_custo_abr = False
+                            le_demanda_cliente = True
+                            continue
+
+                    if le_demanda_cliente:
+                        demanda_cliente.append(linha[0])
+                        le_demanda_cliente = False
+                        le_distancia_planta_cliente = True
+                        continue
+
+                    if le_distancia_planta_cliente:
+                        matriz_cliente_planta_aux.extend(linha)
+                        if len(matriz_cliente_planta_aux) == int(n_plantas):
+                            matriz_cliente_planta.append(matriz_cliente_planta_aux[:])
+                            matriz_cliente_planta_aux.clear()
+                            if len(matriz_cliente_planta) == int(n_clientes):
+                                arq.close()
+                                break
+                            le_distancia_planta_cliente = False
+                            le_demanda_cliente = True
+
+                mp_transp = np.transpose(matriz_cliente_planta)
+                dados[arquivo] = {
+                    "plantas" : n_plantas,
+                    "clientes" : n_clientes,
+                    "capacidade_plantas" : {p: lista_cap[p] for p in range(n_plantas)},
+                    "custo_abertura" : {p: lista_custo_abertura[p] for p in range(n_plantas)},
+                    "demanda_clientes" : {c: int(demanda_cliente[c]) for c in range(n_clientes)},
+                    "matriz_custo" : {(p_c): float(mp_transp[p_c[0],p_c[1]] )for p_c in product(range(n_plantas), range(n_clientes))}
+                }
+
+        return dados
+
+
 
 
 if __name__ == '__main__':
-    prob = leitor_dados(problema='TSP').le_dados_TSP()
+    prob = leitor_dados(problema='Alocacao').le_dados_alocacao_facilities() #Criar método para ler ddados e esse método chama a leitura de dados internos!

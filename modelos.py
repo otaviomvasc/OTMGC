@@ -1,3 +1,5 @@
+import time
+
 import mip
 from itertools import product
 import matplotlib.pyplot as plt
@@ -35,9 +37,10 @@ class ModelAtribuicaoGeneralizada:
         for equips in range(self.n_equipes):
             modelo += mip.xsum(var_atr_equipes[(equips, tar)] * self.consumo_cap[equips][tar] for tar in range(self.n_tarefas)) <= self.capacidades[equips]
 
-
+        init = time.time()
         #chama solve!
         status = modelo.optimize()
+        end = time.time()
 
         if status == mip.OptimizationStatus.OPTIMAL:
             for eq, tarefa in product(range(self.n_equipes), range(self.n_tarefas)):
@@ -47,7 +50,7 @@ class ModelAtribuicaoGeneralizada:
         #Monta exportação!
         valor_fo = modelo.objective_value
         tamanho_instacia = f'{self.n_equipes} e {self.n_tarefas}'
-        tempo_gasto = modelo.max_seconds
+        tempo_gasto =end-init
 
         return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto }
 
@@ -146,8 +149,6 @@ class ModelTSP:
             status = model.optimize(max_seconds=max_seconds)
 
 
-
-
         model = mip.Model('TSP', mip.MINIMIZE)
         var_arco = {pr:model.add_var(name=f'arco {pr[0]} - {pr[1]}', var_type=mip.BINARY)
                     for pr in product(range(self.n), range(self.n)) if pr[0] != pr[1]}
@@ -159,6 +160,7 @@ class ModelTSP:
 
         #Restrições:
         #Cada nó é origem uma vez!
+        init = time.time()
         for n in range(self.n):
             model += mip.xsum(var_arco[(n,j)] for j in range(self.n) if n != j) == 1
 
@@ -169,15 +171,96 @@ class ModelTSP:
         if subrota_TMZ:
             #Restrição MTZ para retirada de sub-rota. Considerei nó 0 como origem!
             rest_subrota_TMZ(model=model, max_seconds=max_seconds)
-            return model.objective_value
+            #return model.objective_value
 
         elif subrota_fluxo_ficticio:
             rest_subrota_fluxo_ficticio(model=model, max_seconds=max_seconds)
-            return model.objective_value
+            #return model.objective_value
 
         elif sub_rota_iterativa():
             rest_sub_rota_iterativa(model=model, max_seconds=max_seconds)
-            return model.objective_value
+            #return model.objective_value
+
+        end = time.time()
+        valor_fo = model.objective_value
+        tamanho_instacia = f'{self.n}'
+        tempo_gasto = end - init
+
+        return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
+
+class AlocacaoFacilities():
+    def __init__(self, dados):
+        self.c_instalacao = dados['custo_abertura']
+        self.demanda = dados['demanda_clientes']
+        self.n_plantas = dados['plantas']
+        self.n_clientes = dados['clientes']
+        self.m_custo = dados['matriz_custo']
+        self.plantas = range(self.n_plantas)
+        self.clientes = range(self.n_clientes)
 
 
+    def otimiza(self):
+        distancias_d = dict()
+        distancias_dict_valores = dict()
+        for cliente in self.clientes:
+            dict_aux = {cb: self.m_custo[cb] for cb in self.m_custo if cb[1] == cliente}
+            distancias_d[cliente] = [i[0] for i in sorted(dict_aux, key=dict_aux.get, reverse=False)]
+            distancias_dict_valores[cliente] = {i: dict_aux[i] for i in
+                                                sorted(dict_aux, key=dict_aux.get, reverse=False)}
 
+        # chamada do modelo
+        model = mip.Model('Problema_Localizacao', mip.MINIMIZE)
+
+        # Criação das variáveis
+        # Variavel binária de escolha de planta
+
+        var_atv_planta = {planta: model.add_var(var_type=mip.BINARY, name=f'atv_planta_{planta}') for planta in self.plantas}
+
+
+        # Variavel z - planta localizada até a distancia máxima distancias_d(cliente, facilities)7
+        dict_teste = dict()
+        z = dict()
+        for cliente in distancias_d:
+            z[cliente] = [model.add_var(var_type=mip.CONTINUOUS, lb=0, name=f'planta_ate {(cliente, planta)}') for
+                          planta
+                          in distancias_d[cliente]]
+
+        model.objective = mip.minimize(
+            # Custo de ativação de planta
+            mip.xsum(var_atv_planta[pl] * self.c_instalacao[pl] for pl in self.plantas) +
+            # custo de transporte!
+            mip.xsum(
+                (self.m_custo[(distancias_d[cliente][0], cliente)] +
+                 (
+                     mip.xsum((self.m_custo[(distancias_d[cliente][k + 1], cliente)] - self.m_custo[
+                         (distancias_d[cliente][k], cliente)]) * z[cliente][k]
+                              for k in range(len(distancias_d[cliente]) - 1) if k < self.n_plantas)
+                 )
+                 ) #* self.demanda[cliente]
+
+                for cliente in self.clientes
+            )
+        )
+
+
+        # A planta escolhida vai zerar a variável z posição 0 daquele cliente!
+        for cliente in self.clientes:
+            model += (z[cliente][0] + var_atv_planta[distancias_d[cliente][0]] >= 1)
+
+        for cliente in self.clientes:
+            for k in self.plantas:
+                if k == 0:
+                    continue
+
+                model += (z[cliente][k] + var_atv_planta[distancias_d[cliente][k]] >= z[cliente][k - 1])
+
+        # Chamadado Solver]
+        init = time.time()
+        status = model.optimize()
+
+        end = time.time()
+        valor_fo = model.objective_value
+        tamanho_instacia = f'{self.plantas} x {self.clientes}'
+        tempo_gasto = end - init
+
+        return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
