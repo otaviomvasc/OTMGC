@@ -1,6 +1,7 @@
 from leitor_dados_txt import leitor_dados
 from modelos import *
 import time
+import pandas as pd
 
 class Controlador:
     def __init__(self, problema, arquivo=None, num=None):
@@ -23,7 +24,7 @@ class Controlador:
 
 
     def otimiza_atribuicao_generalizada(self, arquivo=None, num=None):
-        dict_results= dict()
+        dados_result = list()
         leitor = leitor_dados(problema=self.problema)
         dados = leitor.le_dados_atribuicao_gen()
         #TODO: testar rodada do modelo!!
@@ -35,15 +36,21 @@ class Controlador:
         for arq in dados:
             for prs in dados[arq]:
                 model = ModelAtribuicaoGeneralizada(dados=dados[arq][prs])
+                inicio = time.time()
                 resposta = model.otimiza()
-                dict_results[f"{arq} - {prs}"] = resposta
-                resposta[arquivo] = arq
-                resposta[problema] = prs
-                dados_consolidados.append(resposta)
-        return dict_results
+                fim = time.time() - inicio
+                resposta['problema'] = 'atr_generalizada'
+                resposta['instancia'] = f'{arq} - {prs}'
+                #dict_results[f"{arq} - {prs}"] = resposta
+                resposta['problema'] = 'atr_generalizada'
+                resposta['instancia'] = f'{arq} - {prs}'
+                resposta['tempo'] = fim
+                dados_result.append(copy.deepcopy(resposta))
+
+        return dados_result
 
     def otimiza_TSP(self, arquivo=None):
-        dict_results = dict()
+        dados_result = list()
         leitor = leitor_dados(problema=self.problema)
         dados = leitor.le_dados_TSP()
         if arquivo:
@@ -55,17 +62,20 @@ class Controlador:
             inicio = time.time()
             model = ModelTSP(dados=dados[instancia])
             resposta = model.otimiza(subrota_fluxo_ficticio=True, subrota_TMZ=False, sub_rota_iterativa=False)
-            dict_results[instancia] = resposta
+            resposta['problema'] = 'TSP'
+            resposta['instancia'] = instancia
             fim=time.time()
             print('-' * 90)
             print(f'{dados[instancia].name} = {resposta}')
             print(f'Tempo de resposta: {fim - inicio}')
             print('-' * 90)
+            resposta['tempo'] = fim - inicio
+            dados_result.append(copy.deepcopy(resposta))
 
-        return dict_results
+        return dados_result
     def otimiza_alocacao(self,arquivo=None):
         #TODO:os três metodos dessa classe são quase a mesma coisa. Juntar para 1 só.
-        dict_results = dict()
+        dados_result = list()
         leitor = leitor_dados(problema=self.problema)
         dados = leitor.le_dados_alocacao_facilities()
         if arquivo:
@@ -77,14 +87,18 @@ class Controlador:
             inicio = time.time()
             model = AlocacaoFacilities(dados=dados[instancia])
             resposta = model.otimiza()
-            dict_results[instancia] = resposta
+            resposta['problema'] = 'alocacao'
+            resposta['instancia'] = instancia
+            #dict_results[instancia] = resposta
             fim = time.time()
             print('-' * 90)
             print(f'{instancia} = {resposta}')
             print(f'Tempo de resposta: {fim - inicio}')
             print('-' * 90)
+            resposta['tempo'] = fim - inicio
+            dados_result.append(copy.deepcopy(resposta))
 
-        return dict_results
+        return dados_result
 
 
 if __name__ == '__main__':
@@ -93,17 +107,24 @@ if __name__ == '__main__':
 
     #Passar nome do arquivo para rodar exclusivamente algum. Precisa ser do mesmo problema!
     #arquivo = None
-
+    exporta = True
     #num: Cada arquivo de cada problema tem um número de problemas. usar para passar algum especifico!
-    problema = "Alocacao"
-    controle_aloc = Controlador(problema=problema).otimiza_alocacao()
 
     problema = "atribuicao_generalizada"
     controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()
 
+    problema = "Alocacao"
+    controle_aloc = Controlador(problema=problema).otimiza_alocacao()
+
+
     problema = "TSP"
     controle_tsp = Controlador(problema=problema).otimiza_TSP()
 
-    b=0
-
+    if exporta:
+        list_fim = list()
+        list_fim.extend(controle_aloc)
+        list_fim.extend(controle_atr)
+        list_fim.extend(controle_tsp)
+        df = pd.DataFrame(list_fim)
+        df.to_excel("output.xlsx")
 

@@ -17,7 +17,7 @@ class ModelAtribuicaoGeneralizada:
         self.capacidades = [int(c) for c in dados["capacidade_equipe"]]
 
     def otimiza(self):
-        modelo = mip.Model('Problema_Atribuicao', mip.MINIMIZE)
+        modelo = mip.Model('Problema_Atribuicao', mip.MAXIMIZE)
         var_atr_equipes = {(eq, tarefa): modelo.add_var(f'alocacao equipe {eq} tarefa {tarefa}', var_type=mip.BINARY)
                            for eq, tarefa in product(range(self.n_equipes), range(self.n_tarefas))}
 
@@ -60,7 +60,7 @@ class ModelTSP:
         self.n = dados.dimension
         self.matriz_c = dados.edge_weights
 
-    def otimiza(self, subrota_TMZ=False, subrota_fluxo_ficticio=True, sub_rota_iterativa=False, max_seconds = 3600):
+    def otimiza(self, subrota_TMZ=False, subrota_fluxo_ficticio=False, sub_rota_iterativa=True, max_seconds = 3600):
         def rest_subrota_TMZ(model, max_seconds):
             var_seq = {node: model.add_var(name=f'seq {node}', var_type=mip.INTEGER)
                        for node in range(self.n)}
@@ -260,7 +260,7 @@ class AlocacaoFacilities():
 
         end = time.time()
         valor_fo = model.objective_value
-        tamanho_instacia = f'{self.plantas} x {self.clientes}'
+        tamanho_instacia = f'{self.n_plantas} x {self.n_clientes}'
         tempo_gasto = end - init
 
         return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
