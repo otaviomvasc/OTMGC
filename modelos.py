@@ -264,3 +264,126 @@ class AlocacaoFacilities():
         tempo_gasto = end - init
 
         return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
+
+
+class AlocacaoFacilitiesPrimal():
+    """
+    CLasse utilizada para calcular o valor do subproblema primal de alocação de facilities com Y fixado
+    para garantir que o desenvolvimento do meu dual estará correto, já que ambos precisam ter a mesma F.O
+    dado o mesmo Y
+    """
+
+    def __init__(self, dados):
+        self.c_instalacao = dados['custo_abertura']
+        self.demanda = dados['demanda_clientes']
+        self.n_plantas = dados['plantas']
+        self.n_clientes = dados['clientes']
+        self.m_custo = dados['matriz_custo']
+        self.plantas = range(self.n_plantas)
+        self.clientes = range(self.n_clientes)
+
+
+    def otimiza(self):
+        distancias_d = dict()
+        distancias_dict_valores = dict()
+        for cliente in self.clientes:
+            dict_aux = {cb: self.m_custo[cb] for cb in self.m_custo if cb[1] == cliente}
+            distancias_d[cliente] = [i[0] for i in sorted(dict_aux, key=dict_aux.get, reverse=False)]
+            distancias_dict_valores[cliente] = {i: dict_aux[i] for i in
+                                                sorted(dict_aux, key=dict_aux.get, reverse=False)}
+
+        # chamada do modelo
+        model = mip.Model('Problema_Localizacao', mip.MINIMIZE)
+
+        # Criação das variáveis
+        # Variavel binária de escolha de planta
+        lista_y_inteiros = [1,4,8]
+        var_atv_planta = {planta: (1 if planta in lista_y_inteiros else 0) for planta in self.plantas}
+
+
+        # Variavel z - planta localizada até a distancia máxima distancias_d(cliente, facilities)7
+        dict_teste = dict()
+        z = dict()
+        for cliente in distancias_d:
+            z[cliente] = [model.add_var(var_type=mip.CONTINUOUS, lb=0, name=f'planta_ate {(cliente, planta)}') for
+                          planta
+                          in distancias_d[cliente]]
+
+        model.objective = mip.minimize(
+            # Custo de ativação de planta - Retirada da atv da planta!
+            #mip.xsum(var_atv_planta[pl] * self.c_instalacao[pl] for pl in self.plantas) +
+            # custo de transporte!
+            mip.xsum(
+                (self.m_custo[(distancias_d[cliente][0], cliente)] +
+                 (
+                     mip.xsum((self.m_custo[(distancias_d[cliente][k + 1], cliente)] - self.m_custo[
+                         (distancias_d[cliente][k], cliente)]) * z[cliente][k]
+                              for k in range(len(distancias_d[cliente]) - 1) if k < self.n_plantas)
+                 )
+                 ) #* self.demanda[cliente]
+
+                for cliente in self.clientes
+            )
+        )
+
+
+        # A planta escolhida vai zerar a variável z posição 0 daquele cliente!
+        for cliente in self.clientes:
+            model += (z[cliente][0] + var_atv_planta[distancias_d[cliente][0]] >= 1)
+
+        for cliente in self.clientes:
+            for k in self.plantas:
+                if k == 0:
+                    continue
+
+                model += (z[cliente][k] + var_atv_planta[distancias_d[cliente][k]] >= z[cliente][k - 1])
+
+        # Chamadado Solver]
+        init = time.time()
+        status = model.optimize()
+
+        end = time.time()
+        valor_fo = model.objective_value
+        tamanho_instacia = f'{self.n_plantas} x {self.n_clientes}'
+        tempo_gasto = end - init
+
+        return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
+
+
+
+class AlocacaoFacilitiesDual():
+    """
+    CLasse utilizada para calcular o valor do subproblema DUAL de alocação de facilities com Y fixado nos mesmos valores do primal
+    para garantir que o desenvolvimento do meu dual estará correto, já que ambos precisam ter a mesma F.O
+    dado o mesmo Y
+    """
+
+    def __init__(self, dados):
+        self.c_instalacao = dados['custo_abertura']
+        self.demanda = dados['demanda_clientes']
+        self.n_plantas = dados['plantas']
+        self.n_clientes = dados['clientes']
+        self.m_custo = dados['matriz_custo']
+        self.plantas = range(self.n_plantas)
+        self.clientes = range(self.n_clientes)
+
+    def otimiza(self):
+        distancias_d = dict()
+        distancias_dict_valores = dict()
+        for cliente in self.clientes:
+            dict_aux = {cb: self.m_custo[cb] for cb in self.m_custo if cb[1] == cliente}
+            distancias_d[cliente] = [i[0] for i in sorted(dict_aux, key=dict_aux.get, reverse=False)]
+            distancias_dict_valores[cliente] = {i: dict_aux[i] for i in
+                                                sorted(dict_aux, key=dict_aux.get, reverse=False)}
+
+        # chamada do modelo
+        model = mip.Model('Problema_Localizacao', mip.MINIMIZE)
+
+        # Criação das variáveis
+        # Variavel binária de escolha de planta
+        lista_y_inteiros = [1, 4, 8]
+        var_atv_planta = {planta: (1 if planta in lista_y_inteiros else 0) for planta in self.plantas} #Variável Y nos artigos
+        v = dict()
+        # for cliente in self.clientes:
+        #     v[cliente] = [model.add_var()]
+
