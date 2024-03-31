@@ -268,8 +268,6 @@ class BendersMulticut():
         v = [[max(u[i] - d[i] * c[i][j], 0.0) if j in C else 0.0 for j in J] for i in I]
         return sum(u), u, v
 
-
-
     def solve_master_problem(self):
         m = self.m
         dat = self.dat

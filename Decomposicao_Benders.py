@@ -164,7 +164,7 @@ class Benders():
             v[c] = list()
             for pos in range(self.dat['clientes'] - 1):
                 if k[c] == self.dat['plantas'] - 1 and pos == k[c]:
-                    continue #A planta aberta é a mais longe do cliente e não consigo pegar a distância k+1
+                    k[c] = k[c] - 1 #A planta aberta é a mais longe do cliente e não consigo pegar a distância k+1
                 if pos <= k[c]:
                     ik1 = self.dat['D_ord'][c][pos + 1]
                     ik = self.dat['D_ord'][c][pos]
