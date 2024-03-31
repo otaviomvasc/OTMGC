@@ -48,6 +48,8 @@ class Benders():
         a = [7 ,6, 0, 24, 7, 0, 1, 5, 7, 7, 3, 10, 5, 0, 6, 7, 3, 8, 3, 6, 3, 6, 10, 0, 19, 10, 12, 10, 19, 0, 0, 10, 0, 16, 19, 19, 17, 5, 23, 24, 19 ,3, 7, 6, 22, 23, 23, 6, 24, 19]
         melhor_solucao = np.unique(a)
         _y_teste = [0 if p not in melhor_solucao else 1 for p in range(len(y))]
+        best_solution = [1., 0., 0., 1., 0., 1., 1., 1., 1., 0., 1., 0., 1., 0., 0., 0., 1.,
+        0., 0., 1., 0., 1., 0., 1., 1.]
         phi, _k, _v = self.solve_dual_problem_Segunda_Formulacao(_y_teste)
         custo_total  = len(melhor_solucao) * 7500 + phi
         solucao_otima = 796648
@@ -164,7 +166,7 @@ class Benders():
             v[c] = list()
             for pos in range(self.dat['clientes'] - 1):
                 if k[c] == self.dat['plantas'] - 1 and pos == k[c]:
-                    k[c] = k[c] - 1 #A planta aberta é a mais longe do cliente e não consigo pegar a distância k+1
+                    k[c] = k[c] -1 #A planta aberta é a mais longe do cliente e não consigo pegar a distância k+1
                 if pos <= k[c]:
                     ik1 = self.dat['D_ord'][c][pos + 1]
                     ik = self.dat['D_ord'][c][pos]
