@@ -48,10 +48,9 @@ class Benders():
         a = [7 ,6, 0, 24, 7, 0, 1, 5, 7, 7, 3, 10, 5, 0, 6, 7, 3, 8, 3, 6, 3, 6, 10, 0, 19, 10, 12, 10, 19, 0, 0, 10, 0, 16, 19, 19, 17, 5, 23, 24, 19 ,3, 7, 6, 22, 23, 23, 6, 24, 19]
         melhor_solucao = np.unique(a)
         _y_teste = [0 if p not in melhor_solucao else 1 for p in range(len(y))]
-        best_solution = [1., 0., 0., 1., 0., 1., 1., 1., 1., 0., 1., 0., 1., 0., 0., 0., 1.,
-        0., 0., 1., 0., 1., 0., 1., 1.]
+
         phi, _k, _v = self.solve_dual_problem_Segunda_Formulacao(_y_teste)
-        custo_total  = len(melhor_solucao) * 7500 + phi
+        custo_total = (len(melhor_solucao)-1) * 7500 + phi
         solucao_otima = 796648
         b=0
 
@@ -74,7 +73,7 @@ class Benders():
             h += 1
             lb, _eta, _y = self.solve_master_problem()
             assert _y.all() != None, '\n\nerror running the Benders algorithm\n\n'
-            #self.testa_calculo_dual(_y)
+            self.testa_calculo_dual(_y)
             phi, _k, _v = self.solve_dual_problem_Segunda_Formulacao(_y)
 
             #self.add_benders_cuts(_u, _v)
@@ -88,6 +87,8 @@ class Benders():
                 self.is_hotstart = False
                 ub = float('inf')
                 ittype = 'i'
+
+        return _y
 
     def print_iteration_info(self, ittype, h, sup, ub, lb, rt):
         gap = 100.0 * (ub - lb) / ub
@@ -104,16 +105,15 @@ class Benders():
         y, eta = m.y, m.eta
 
         for c in range(self.dat['clientes']):
-            if _k[c] == 0:
+            if _k[c] == -1:
                 m += eta[c] >= self.dat['matriz_custo'][(self.dat['D_ord'][c][0], c)]
             else:
                 if _k[c] == (len(y) - 1):
-                    _k[c] = 23
+                   b=0
                 lista_ord = self.dat['D_ord'][c]
                 par_s = (lista_ord[_k[c] + 1], c)
-                par_a = (lista_ord[_k[c]], c)
-                m += (eta[c] + xsum((self.dat['matriz_custo'][par_s] - self.dat['matriz_custo'][(j, c)])
-                               * y[j] for j in lista_ord[:_k[c]]) >= self.dat['matriz_custo'][par_s])
+                m += (eta[c] >= self.dat['matriz_custo'][par_s] - xsum((self.dat['matriz_custo'][par_s] - self.dat['matriz_custo'][(j, c)])
+                               * y[j] for j in lista_ord[:_k[c]+1]))
 
 
     def add_benders_cuts(self, _u, _v):
@@ -154,29 +154,58 @@ class Benders():
                 k[c] = 0
             else:
                 for i in range(len(self.dat['D_ord'][0])):
-                    if it_aux[i] >= aux and it_aux[i] < 1:
-                        aux = it_aux[i]
-                        result.append(i)
-                k[c] = max(result)
+                    #if it_aux[i] >= aux and it_aux[i] <= 1:
+                        # aux = it_aux[i]
+                        # result.append(i)
+                    aux += it_aux[i]
+                    if aux >= 1:
+                        k[c] = i
+                        break
 
         #Após o cálculo do k~ tem que se calcular a F.O otima para dado k e y
         #Mesma ideia da parte de cima. Fazer código explicito e depois refatorar!
-        v = dict()
-        for c in range(self.dat['clientes']):
-            v[c] = list()
-            for pos in range(self.dat['clientes'] - 1):
-                if k[c] == self.dat['plantas'] - 1 and pos == k[c]:
-                    k[c] = k[c] -1 #A planta aberta é a mais longe do cliente e não consigo pegar a distância k+1
-                if pos <= k[c]:
-                    ik1 = self.dat['D_ord'][c][pos + 1]
-                    ik = self.dat['D_ord'][c][pos]
-                    Dk2 = self.dat['matriz_custo'][(ik1, c)]
-                    Dk1 = self.dat['matriz_custo'][(ik, c)]
-                    v[c].append(Dk2 - Dk1)
+        dual = False
+        if dual:
+            v = dict()
+            for c in range(self.dat['clientes']):
+                v[c] = list()
+                for pos in range(self.dat['clientes'] - 1):
+                    if pos <= k[c] - 1:
+                        ik1 = self.dat['D_ord'][c][k[c]]
+                        ik = self.dat['D_ord'][c][pos]
+                        Dk2 = self.dat['matriz_custo'][(ik1, c)]
+                        Dk1 = self.dat['matriz_custo'][(ik, c)]
+                        v[c].append(Dk2 - Dk1)
+                    else:
+                        # ik1 = self.dat['D_ord'][c][k[c]]
+                        # Dk2 = self.dat['matriz_custo'][(ik1, c)]
+                        v[c].append(0)
+                        break
+        else:
+            v = dict()
+            for c in range(self.dat['clientes']):
+                v[c] = list()
+                if k[c] == 0:
+                    ik = self.dat['D_ord'][c][0]
+                    Dk2 = self.dat['matriz_custo'][(ik, c)]
+                    v[c].append(Dk2)
                 else:
-                    v[c].append(0)
+                    ik1 = self.dat['D_ord'][c][k[c]]
+                    Dk2 = self.dat['matriz_custo'][(ik, c)]
+                    aux = 0
+                    # aux = sum((Dk2 - self.dat['matriz_custo'][(i, c)]) * _y[i] for i in self.dat['D_ord'][c] if
+                    #     self.dat['D_ord'][c].index(i) <= self.dat['D_ord'][c].index(k[c]))
+                    for ll in range(len(self.dat['D_ord'][c])):
+                        if ll > k[c]:
+                            break
+                        planta = self.dat['D_ord'][c][ll]
+                        aux += (Dk2 - self.dat['matriz_custo'][(planta, c)]) *_y[planta]
+                    vf = Dk2 - aux
+                    v[c].append(vf)
 
         return round(sum(sum(v[c]) for c in range(self.dat['clientes']))), k, v
+
+
 
     def solve_dual_subproblem_knapsack(self, _y):
         dat = self.dat
