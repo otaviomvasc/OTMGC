@@ -9,7 +9,7 @@ from time import time
 Classe para resolver o problema de alocação através
 da decomposição de benders
 """
-EPSILON = 1e-5
+EPSILON = 1
 ni, nj = 30,10
 class Benders():
     def __init__(self, dat, is_hotstart = True, is_knapsack = False):
@@ -38,7 +38,7 @@ class Benders():
         m.y = y
         m.eta = eta
 
-        m.objective = minimize(sum(7500 * y[j] for j in J) + xsum(eta[i] for i in I))
+        m.objective = minimize(sum(dat['custo_abertura'][j] * y[j] for j in J) + xsum(eta[i] for i in I))
 
         m += xsum(y[j] for j in J) >= 1  #Corte de viabilidade, já que solução viável precisa ter pelo menos 1 facility aberto
         #m.write('pmr.lp')
@@ -66,14 +66,14 @@ class Benders():
         else:
             ittype = 'i'
         while (ub - lb > EPSILON):
-            if h > 100:
+            if h > 15:
                 self.is_hotstart = False
                 lb, _eta, _y = self.solve_master_problem()
 
             h += 1
             lb, _eta, _y = self.solve_master_problem()
             assert _y.all() != None, '\n\nerror running the Benders algorithm\n\n'
-            self.testa_calculo_dual(_y)
+            #self.testa_calculo_dual(_y)
             phi, _k, _v = self.solve_dual_problem_Segunda_Formulacao(_y)
 
             #self.add_benders_cuts(_u, _v)
@@ -105,15 +105,13 @@ class Benders():
         y, eta = m.y, m.eta
 
         for c in range(self.dat['clientes']):
-            if _k[c] == -1:
+            if _k[c] == 0:
                 m += eta[c] >= self.dat['matriz_custo'][(self.dat['D_ord'][c][0], c)]
             else:
-                if _k[c] == (len(y) - 1):
-                   b=0
                 lista_ord = self.dat['D_ord'][c]
-                par_s = (lista_ord[_k[c] + 1], c)
+                par_s = (lista_ord[_k[c]], c)
                 m += (eta[c] >= self.dat['matriz_custo'][par_s] - xsum((self.dat['matriz_custo'][par_s] - self.dat['matriz_custo'][(j, c)])
-                               * y[j] for j in lista_ord[:_k[c]+1]))
+                               * y[j] for j in lista_ord[:_k[c]]))
 
 
     def add_benders_cuts(self, _u, _v):
@@ -191,7 +189,7 @@ class Benders():
                     v[c].append(Dk2)
                 else:
                     ik1 = self.dat['D_ord'][c][k[c]]
-                    Dk2 = self.dat['matriz_custo'][(ik, c)]
+                    Dk2 = self.dat['matriz_custo'][(ik1, c)]
                     aux = 0
                     # aux = sum((Dk2 - self.dat['matriz_custo'][(i, c)]) * _y[i] for i in self.dat['D_ord'][c] if
                     #     self.dat['D_ord'][c].index(i) <= self.dat['D_ord'][c].index(k[c]))

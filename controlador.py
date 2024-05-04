@@ -105,8 +105,8 @@ class Controlador:
             dados[instancia]["D_ord"] = D_Ordenado
             model = Benders(dat=dados[instancia])
             resposta = model.run()
-            resposta['problema'] = 'alocacao'
-            resposta['instancia'] = instancia
+            # resposta['problema'] = 'alocacao'
+            # resposta['instancia'] = instancia
             #dict_results[instancia] = resposta
             #fim = time.time()
             # print('-' * 90)
@@ -118,7 +118,10 @@ class Controlador:
 
         return dados_result
 
-
+"""
+a = [11, 11, 0, 24, 11, 0, 16, 5, 11, 11, 3, 10, 5, 0, 6, 11, 3, 10, 3, 6, 3, 6, 10, 0, 11, 10, 12, 10, 10, 0, 0, 10, 0, 16, 11, 11, 24, 5, 23, 24, 10, 3, 11, 6, 22, 23, 23, 6, 24, 11]
+array([ 0,  3,  5,  6, 10, 11, 12, 16, 22, 23, 24])
+"""
 if __name__ == '__main__':
     #NOME DO PROBLEMA PRECISA SER O MESMO DA PASTA COM AS INSTANCIAS!!
     #
