@@ -19,6 +19,10 @@ class Controlador:
 
         elif self.problema == 'AlocacaoBENDERS':
             self.otimiza_Benders(arquivo=arquivo)
+
+        elif self.problema == "AlocacaoBENDERSBendersBranchAndCut":
+            self.otimiza_Benders_BranchAndCut(arquivo=arquivo)
+
         else:
             print(f'O Problema {problema} está incorreto. '
                   f'Tente: atribuicao_generalizada '
@@ -89,7 +93,7 @@ class Controlador:
                                                     sorted(dict_aux, key=dict_aux.get, reverse=False)}
 
             return distancias_d, distancias_dict_valores
-        #TODO:os três metodos dessa classe são quase a mesma coisa. Juntar para 1 só.
+        #TODO:os quatro metodos dessa classe são quase a mesma coisa. Juntar para 1 só.
         dados_result = list()
         self.problema = "Alocacao"
         leitor = leitor_dados(problema=self.problema)
@@ -100,21 +104,47 @@ class Controlador:
             print('-' * 90)
             print(f'Rodando o Arquivo {instancia}')
             print('-' * 90)
-            #inicio = time.time()
+            inicio = time()
             D_Ordenado, _ = cria_matriz_custo_ordenada(d=dados[instancia])
             dados[instancia]["D_ord"] = D_Ordenado
             model = Benders(dat=dados[instancia])
-            resposta = model.run()
-            # resposta['problema'] = 'alocacao'
-            # resposta['instancia'] = instancia
-            #dict_results[instancia] = resposta
-            #fim = time.time()
-            # print('-' * 90)
-            # print(f'{instancia} = {resposta}')
-            # print(f'Tempo de resposta: {fim - inicio}')
-            # print('-' * 90)
-            # resposta['tempo'] = fim - inicio
-            dados_result.append(copy.deepcopy(resposta))
+            resposta, fo = model.run()
+            tempo_total = time() - inicio
+            dados_result.append({"Cenario": instancia, "tempo": tempo_total, "FO": fo})
+
+        return dados_result
+
+    def otimiza_Benders_BranchAndCut(self, arquivo=None):
+        def cria_matriz_custo_ordenada(d):
+            # TODO: SERÁ QUE COMPENSA TRABALHAR COM 2 DICTS AGORA QUE ELES VÃO SER CONSULTADOS E ITERADOS MAIS VEZES PELO BENDERS?
+            distancias_d = dict()
+            distancias_dict_valores = dict()
+            for cliente in range(d['clientes']):
+                dict_aux = {cb: d['matriz_custo'][cb] for cb in d['matriz_custo'] if cb[1] == cliente}
+                distancias_d[cliente] = [i[0] for i in sorted(dict_aux, key=dict_aux.get, reverse=False)]
+                distancias_dict_valores[cliente] = {i: dict_aux[i] for i in
+                                                    sorted(dict_aux, key=dict_aux.get, reverse=False)}
+
+            return distancias_d, distancias_dict_valores
+
+        # TODO:os quatro metodos dessa classe são quase a mesma coisa. Juntar para 1 só.
+        dados_result = list()
+        self.problema = "Alocacao"
+        leitor = leitor_dados(problema=self.problema)
+        dados = leitor.le_dados_alocacao_facilities()
+        if arquivo:
+            dados = {arquivo: dados[arquivo]}
+        for instancia in dados:
+            print('-' * 90)
+            print(f'Rodando o Arquivo {instancia}')
+            print('-' * 90)
+            inicio = time()
+            D_Ordenado, _ = cria_matriz_custo_ordenada(d=dados[instancia])
+            dados[instancia]["D_ord"] = D_Ordenado
+            model = BendersBranchAndCut(dat=dados[instancia])
+            resposta, fo = model.run()
+            tempo_total = time() - inicio
+            dados_result.append({"Cenario": instancia, "tempo": tempo_total, "FO": fo})
 
         return dados_result
 
@@ -134,9 +164,22 @@ if __name__ == '__main__':
     problema = "AlocacaoBENDERS"
     controle_aloc = Controlador(problema=problema).otimiza_Benders()
 
-    # problema = "AlocacaoPrimal"
-    # controle_aloc = Controlador(problema=problema).otimiza_alocacao()
-    #
+
+    problema = "AlocacaoBENDERSBendersBranchAndCut"
+    controle_aloc_2 = Controlador(problema=problema).otimiza_Benders_BranchAndCut()
+
+    df_benders = pd.DataFrame(controle_aloc)
+    df_benders['Método'] = 'Benders_MultiCut'
+
+    df_benders_Branch_and_cut = pd.DataFrame(controle_aloc_2)
+    df_benders_Branch_and_cut['Método'] = 'Benders_BranchAnCut'
+
+    #df_fim = pd.concat([df_benders, df_benders_Branch_and_cut])
+    df_fim = df_benders.merge(df_benders_Branch_and_cut, on='Cenario')
+    df_fim['Diff_tempo'] = df_fim.tempo_x - df_fim.tempo_y
+    df_fim['Diff_FO'] = df_fim.FO_x - df_fim.FO_y
+    df_fim.to_excel("Respostas_tp2.xlsx")
+
     # problema = "atribuicao_generalizada"
     # controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()
     #

@@ -7,7 +7,7 @@ from time import time
 
 """
 Classe para resolver o problema de alocação através
-da decomposição de benders
+da decomposição de benders. Métodos copiados do arquivo Decomposicao_Bender_Prof
 """
 EPSILON = 1
 ni, nj = 30,10
@@ -66,10 +66,6 @@ class Benders():
         else:
             ittype = 'i'
         while (ub - lb > EPSILON):
-            if h > 15:
-                self.is_hotstart = False
-                lb, _eta, _y = self.solve_master_problem()
-
             h += 1
             lb, _eta, _y = self.solve_master_problem()
             assert _y.all() != None, '\n\nerror running the Benders algorithm\n\n'
@@ -88,7 +84,7 @@ class Benders():
                 ub = float('inf')
                 ittype = 'i'
 
-        return _y
+        return _y, ub
 
     def print_iteration_info(self, ittype, h, sup, ub, lb, rt):
         gap = 100.0 * (ub - lb) / ub
@@ -112,25 +108,6 @@ class Benders():
                 par_s = (lista_ord[_k[c]], c)
                 m += (eta[c] >= self.dat['matriz_custo'][par_s] - xsum((self.dat['matriz_custo'][par_s] - self.dat['matriz_custo'][(j, c)])
                                * y[j] for j in lista_ord[:_k[c]]))
-
-
-    def add_benders_cuts(self, _u, _v):
-        m = self.m
-        dat = self.dat
-        I, J = range(dat.ni), range(dat.nj)
-        y, eta = m.y, m.eta
-        m += eta >= sum(_u) - xsum(sum(_v[i][j] for i in I) * y[j] for j in J)
-
-    def solve_dual_subproblem(self, _y):
-
-        dat = self.dat
-        I, J = range(dat.ni), range(dat.nj)
-        c, d = dat.c, dat.d
-        O = [j for j in J if _y[j] > 0.9]
-        C = [j for j in J if _y[j] < 0.1]
-        u = [min([d[i] * c[i][j] for j in O]) for i in I]
-        v = [[max(u[i] - d[i] * c[i][j], 0.0) if j in C else 0.0 for j in J] for i in I]
-        return sum(u), u, v
 
     def solve_dual_problem_Segunda_Formulacao(self, _y):
         """
@@ -203,33 +180,6 @@ class Benders():
 
         return round(sum(sum(v[c]) for c in range(self.dat['clientes']))), k, v
 
-
-
-    def solve_dual_subproblem_knapsack(self, _y):
-        dat = self.dat
-        I, J = range(dat.ni), range(dat.nj)
-        c, d = dat.c, dat.d
-        u = np.zeros(ni, dtype=float)
-        v = np.zeros((ni, nj), dtype=float)
-        phi = 0.0
-        for i in I:
-            sy = _y[dat.sorted_c[i]]
-            csum = np.cumsum(sy)
-            k = np.argmax(csum >= 1)
-            _u = dat.d[i] * dat.c[i][dat.sorted_c[i][k]]
-            u[i] = _u
-            phi += _u
-            for p in J:
-                if p < k:
-                    _j = dat.sorted_c[i][p]
-                    _v = max(u[i] - dat.d[i] * dat.c[i][_j], 0.0)
-                    v[i][_j] = _v
-                    phi -= _v * _y[_j]
-                else:
-                     break
-
-        return phi, u, v
-
     def solve_master_problem(self):
         m = self.m
         dat = self.dat
@@ -243,3 +193,156 @@ class Benders():
 
 
         return lb, _eta, _y
+
+class BendersCutCutGenerator(ConstrsGenerator):
+    def __init__(self, dat,y,eta):
+        self.dat = dat
+        self.y,self.eta=y,eta
+
+    def generate_constrs(self,model: Model, depth: int=0, npass: int=0):
+        dat = self.dat
+        I,J = range(dat['clientes']),range(dat['plantas'])
+
+        y,eta = self.y,self.eta
+        ly,leta = model.translate(y),model.translate(eta)
+
+        _y = np.array([ly[j].x if ly[j] else 0 for j in J])
+        _eta = np.array([leta[i].x if leta[i] else 0 for i in I])
+
+
+        phi,_k,_v = self.solve_dual_problem(_y)
+        self.add_benders_cuts_formulacao(_k, _v, model, ly, leta)
+        # for i in I:
+        #     if phi[i] - _eta[i] > EPSILON:
+        #         cut = leta[i] >= u[i] - xsum(v[i][j] * ly[j] for j in J)
+        #         model += cut
+
+    def add_benders_cuts_formulacao(self, _k, _v, model, ly, leta):
+        m = model
+        y, eta = ly, leta
+
+        for c in range(self.dat['clientes']):
+            if _k[c] == 0:
+                m += eta[c] >= self.dat['matriz_custo'][(self.dat['D_ord'][c][0], c)]
+            else:
+                lista_ord = self.dat['D_ord'][c]
+                par_s = (lista_ord[_k[c]], c)
+                m += (eta[c] >= self.dat['matriz_custo'][par_s] - xsum((self.dat['matriz_custo'][par_s] - self.dat['matriz_custo'][(j, c)])
+                               * y[j] for j in lista_ord[:_k[c]]))
+    def solve_dual_problem(self, _y):
+        k = dict()
+        for c in range(self.dat['clientes']):
+            aux = 0
+            result = list()
+            it_aux = [_y[p] for p in self.dat['D_ord'][c]]
+            if _y[self.dat['D_ord'][c][0]] >= 1:
+                # Estou implementando da forma mais parecida com o artigo para melhor entendimento.
+                # Após a conferência do resultado, voltar e otimizar o código.
+                # Artigo também indica que se solução for binária é mais fácil calcular, porém vou deixar assim para tentar ficar genérico
+                k[c] = 0
+            else:
+                for i in range(len(self.dat['D_ord'][0])):
+                    # if it_aux[i] >= aux and it_aux[i] <= 1:
+                    # aux = it_aux[i]
+                    # result.append(i)
+                    aux += it_aux[i]
+                    if aux >= 1:
+                        k[c] = i
+                        break
+
+        # Após o cálculo do k~ tem que se calcular a F.O otima para dado k e y
+        # Mesma ideia da parte de cima. Fazer código explicito e depois refatorar!
+        dual = False
+        if dual:
+            v = dict()
+            for c in range(self.dat['clientes']):
+                v[c] = list()
+                for pos in range(self.dat['clientes'] - 1):
+                    if pos <= k[c] - 1:
+                        ik1 = self.dat['D_ord'][c][k[c]]
+                        ik = self.dat['D_ord'][c][pos]
+                        Dk2 = self.dat['matriz_custo'][(ik1, c)]
+                        Dk1 = self.dat['matriz_custo'][(ik, c)]
+                        v[c].append(Dk2 - Dk1)
+                    else:
+                        # ik1 = self.dat['D_ord'][c][k[c]]
+                        # Dk2 = self.dat['matriz_custo'][(ik1, c)]
+                        v[c].append(0)
+                        break
+        else:
+            v = dict()
+            for c in range(self.dat['clientes']):
+                v[c] = list()
+                if k[c] == 0:
+                    ik = self.dat['D_ord'][c][0]
+                    Dk2 = self.dat['matriz_custo'][(ik, c)]
+                    v[c].append(Dk2)
+                else:
+                    ik1 = self.dat['D_ord'][c][k[c]]
+                    Dk2 = self.dat['matriz_custo'][(ik1, c)]
+                    aux = 0
+                    # aux = sum((Dk2 - self.dat['matriz_custo'][(i, c)]) * _y[i] for i in self.dat['D_ord'][c] if
+                    #     self.dat['D_ord'][c].index(i) <= self.dat['D_ord'][c].index(k[c]))
+                    for ll in range(len(self.dat['D_ord'][c])):
+                        if ll > k[c]:
+                            break
+                        planta = self.dat['D_ord'][c][ll]
+                        aux += (Dk2 - self.dat['matriz_custo'][(planta, c)]) * _y[planta]
+                    vf = Dk2 - aux
+                    v[c].append(vf)
+
+        return round(sum(sum(v[c]) for c in range(self.dat['clientes']))), k, v
+
+
+class BendersBranchAndCut():
+    def __init__(self, dat):
+        self.dat = dat
+        self.create_master_problem()
+
+    def create_master_problem(self):
+        dat = self.dat
+        m = Model(name='PMR', solver_name=CBC)
+        m.verbose = 0
+        I,J = range(dat['clientes']),range(dat['plantas']) #TODO: Não é melhor criar a classe DAT?
+
+        y = [m.add_var(var_type=BINARY, name='y(%d)'%j) for j in J]
+        eta = [m.add_var(var_type=CONTINUOUS, lb=0.0, name='eta(%d)' % i) for i in I]
+        m.y = y
+        m.eta = eta
+
+        m.objective = minimize(sum(dat['custo_abertura'][j] * y[j] for j in J) + xsum(eta[i] for i in I))
+
+        m += xsum(y[j] for j in J) >= 1  #Corte de viabilidade, já que solução viável precisa ter pelo menos 1 facility aberto
+        #m.write('pmr.lp')
+        self.m = m
+
+    def run(self):
+        ...
+        m = self.m
+        m.cuts_generator = BendersCutCutGenerator(self.dat, m.y, m.eta)
+        m.lazy_constrs_generator = BendersCutCutGenerator(self.dat, m.y, m.eta)
+        print('\n\n\n')
+        m.verbose = 0
+        start_time = time()
+        status = m.optimize()
+        self.run_time = time() - start_time
+        if status == OptimizationStatus.OPTIMAL:
+            self.is_solution = True
+            #self.print_solution()
+            return [a for a in m.y if a.x > 0], m.objective_value
+    def print_solution(self):
+        if self.is_solution == True:
+            dat = self.dat
+            m = self.m
+        I, J = range(dat['clientes']),range(dat['plantas'])
+        print("Custo total : {:12,.2f}.".format(m.objective_value))
+        print("Tempo total : {:12,.2f}.".format(self.run_time))
+        print("facilidades ")
+        for j in J:
+            if m.y[j].x > 1e-6:
+                print("{:5d} ".format(j + 1), end='')
+            print()
+        else:
+            print()
+            print('Nao ha solucao disponivel para impressao')
+            print()

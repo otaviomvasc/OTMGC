@@ -323,8 +323,8 @@ class BendersCutCutGenerator(ConstrsGenerator):
                     _v = max(0.0, u[i] - dat.d[i] * dat.c[i][_j])
                     v[i][_j] = _v
                     phi[i] -= _v * _y[_j]
-            else:
-                break
+                else:
+                    break
 
         return phi, u, v
 
@@ -350,7 +350,6 @@ class BendersBranchAndCut():
         #m.write('pmr.lp')
         self.m = m
 
-
     def run(self):
         m = self.m
         m.cuts_generator = BendersCutCutGenerator(self.dat, m.y, m.eta)
@@ -360,6 +359,7 @@ class BendersBranchAndCut():
         start_time = time()
         status = m.optimize()
         self.run_time = time() - start_time
+        print(status)
         if status == OptimizationStatus.OPTIMAL:
             self.is_solution = True
             self.print_solution()
@@ -368,13 +368,13 @@ class BendersBranchAndCut():
         if self.is_solution == True:
             dat = self.dat
             m = self.m
-        I, J = range(dat.ni), range(dat.nj)
-        print("Custo total : {:12,.2f}.".format(m.objective_value))
-        print("Tempo total : {:12,.2f}.".format(self.run_time))
-        print("facilidades ")
-        for j in J:
-            if m.y[j].x > 1e-6:
-                print("{:5d} ".format(j + 1), end='')
+            I, J = range(dat.ni), range(dat.nj)
+            print("Custo total : {:12,.2f}.".format(m.objective_value))
+            print("Tempo total : {:12,.2f}.".format(self.run_time))
+            print("facilidades ")
+            for j in J:
+                if m.y[j].x > 1e-6:
+                   print("{:5d} ".format(j + 1), end='')
             print()
         else:
             print()
@@ -442,11 +442,11 @@ class UFLP():
 if __name__ == "__main__":
     args = sys.argv
     #assert len(args) > 2, f"\n\nuse: %s ni nj\n\n" % args[0]
-    ni, nj = 30, 10
+    ni, nj = 10, 10
     dat = Data(ni, nj)
     uflp = UFLP(dat)
-    #uflp.run()
-    #uflp.print_solution()
+    uflp.run()
+    uflp.print_solution()
 
     # bd = Benders(dat)
     # bd.run()
@@ -460,8 +460,8 @@ if __name__ == "__main__":
     # bdmcut = BendersMulticut(dat)
     # bdmcut.run()
 
-    bdmcut = BendersMulticut(dat, is_hotstart=True)
-    bdmcut.run()
+    # bdmcut = BendersMulticut(dat, is_hotstart=True)
+    # bdmcut.run()
     bdbc = BendersBranchAndCut(dat)
     bdbc.run()
 

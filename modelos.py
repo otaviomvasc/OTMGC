@@ -265,7 +265,6 @@ class AlocacaoFacilities():
 
         return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
 
-
 class AlocacaoFacilitiesPrimal():
     """
     CLasse utilizada para calcular o valor do subproblema primal de alocação de facilities com Y fixado
@@ -348,8 +347,6 @@ class AlocacaoFacilitiesPrimal():
         tempo_gasto = end - init
 
         return {"valor_fo": valor_fo, "tamanho_instacia": tamanho_instacia, "tempo": tempo_gasto}
-
-
 
 class AlocacaoFacilitiesDual():
     """
