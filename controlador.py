@@ -23,11 +23,39 @@ class Controlador:
         elif self.problema == "AlocacaoBENDERSBendersBranchAndCut":
             self.otimiza_Benders_BranchAndCut(arquivo=arquivo)
 
+        elif self.problema == "GapLagrange":
+            self.otimiza_Lagrange(arquivo=arquivo)
+
         else:
             print(f'O Problema {problema} está incorreto. '
                   f'Tente: atribuicao_generalizada '
                   f'ou TSP'
                   f'ou Alocacao')
+
+    def otimiza_Lagrange(self, arquivo=None, num=None):
+        dados_result = list()
+        leitor = leitor_dados(problema="atribuicao_generalizada")
+        dados = leitor.le_dados_atribuicao_gen()
+        # TODO: testar rodada do modelo!!
+        if arquivo:
+            dados = dados[arquivo]
+            if num:
+                dados = dados[int(num)]
+        dados_consolidados = list()
+        for arq in dados:
+            for prs in dados[arq]:
+                model = EgapLangrange(dados=dados[arq][prs])
+                #inicio = time.time()
+                resposta = model.otimiza()
+                #fim = time.time() - inicio
+                resposta['problema'] = 'atr_generalizada'
+                resposta['instancia'] = f'{arq} - {prs}'
+                # dict_results[f"{arq} - {prs}"] = resposta
+                resposta['problema'] = 'atr_generalizada'
+                resposta['instancia'] = f'{arq} - {prs}'
+                resposta['tempo'] = 0
+                dados_result.append(copy.deepcopy(resposta))
+        return dados_result
 
 
     def otimiza_atribuicao_generalizada(self, arquivo=None, num=None):
@@ -43,9 +71,9 @@ class Controlador:
         for arq in dados:
             for prs in dados[arq]:
                 model = ModelAtribuicaoGeneralizada(dados=dados[arq][prs])
-                inicio = time.time()
+                #inicio = time.time()
                 resposta = model.otimiza()
-                fim = time.time() - inicio
+                fim = 0 - 0
                 resposta['problema'] = 'atr_generalizada'
                 resposta['instancia'] = f'{arq} - {prs}'
                 #dict_results[f"{arq} - {prs}"] = resposta
@@ -84,6 +112,7 @@ class Controlador:
     def otimiza_Benders(self, arquivo=None):
         def cria_matriz_custo_ordenada(d):
             #TODO: SERÁ QUE COMPENSA TRABALHAR COM 2 DICTS AGORA QUE ELES VÃO SER CONSULTADOS E ITERADOS MAIS VEZES PELO BENDERS?
+            #TODO: preciso retirar as instâncias com distâncias repetidas!!
             distancias_d = dict()
             distancias_dict_valores = dict()
             for cliente in range(d['clientes']):
@@ -161,24 +190,31 @@ if __name__ == '__main__':
     exporta = True
     #num: Cada arquivo de cada problema tem um número de problemas. usar para passar algum especifico!
 
-    problema = "AlocacaoBENDERS"
-    controle_aloc = Controlador(problema=problema).otimiza_Benders()
+    # problema = "AlocacaoBENDERS"
+    # controle_aloc = Controlador(problema=problema).otimiza_Benders()
+    arquivo = "gap_1.txt"
+    problema = "atribuicao_generalizada"
+    controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()
 
+    problema  = "GapLagrange"
+    lagrange = Controlador(problema=problema)
+    for i in range(len(controle_atr)):
+        print(f'Exato - Heuristica: {controle_atr[i]["valor_fo"] - lagrange[i]["valor_fo"]}')
+    b=0
+    # problema = "AlocacaoBENDERSBendersBranchAndCut"
+    # controle_aloc_2 = Controlador(problema=problema).otimiza_Benders_BranchAndCut()
 
-    problema = "AlocacaoBENDERSBendersBranchAndCut"
-    controle_aloc_2 = Controlador(problema=problema).otimiza_Benders_BranchAndCut()
-
-    df_benders = pd.DataFrame(controle_aloc)
-    df_benders['Método'] = 'Benders_MultiCut'
-
-    df_benders_Branch_and_cut = pd.DataFrame(controle_aloc_2)
-    df_benders_Branch_and_cut['Método'] = 'Benders_BranchAnCut'
-
-    #df_fim = pd.concat([df_benders, df_benders_Branch_and_cut])
-    df_fim = df_benders.merge(df_benders_Branch_and_cut, on='Cenario')
-    df_fim['Diff_tempo'] = df_fim.tempo_x - df_fim.tempo_y
-    df_fim['Diff_FO'] = df_fim.FO_x - df_fim.FO_y
-    df_fim.to_excel("Respostas_tp2.xlsx")
+    # df_benders = pd.DataFrame(controle_aloc)
+    # df_benders['Método'] = 'Benders_MultiCut'
+    #
+    # df_benders_Branch_and_cut = pd.DataFrame(controle_aloc_2)
+    # df_benders_Branch_and_cut['Método'] = 'Benders_BranchAnCut'
+    #
+    # #df_fim = pd.concat([df_benders, df_benders_Branch_and_cut])
+    # df_fim = df_benders.merge(df_benders_Branch_and_cut, on='Cenario')
+    # df_fim['Diff_tempo'] = df_fim.tempo_x - df_fim.tempo_y
+    # df_fim['Diff_FO'] = df_fim.FO_x - df_fim.FO_y
+    # df_fim.to_excel("Respostas_tp2.xlsx")
 
     # problema = "atribuicao_generalizada"
     # controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()

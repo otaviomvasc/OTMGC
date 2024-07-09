@@ -37,7 +37,6 @@ class Benders():
         eta = [m.add_var(var_type=CONTINUOUS, lb=0.0, name='eta(%d)' % i) for i in I]
         m.y = y
         m.eta = eta
-
         m.objective = minimize(sum(dat['custo_abertura'][j] * y[j] for j in J) + xsum(eta[i] for i in I))
 
         m += xsum(y[j] for j in J) >= 1  #Corte de viabilidade, já que solução viável precisa ter pelo menos 1 facility aberto
