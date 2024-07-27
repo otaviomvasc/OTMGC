@@ -3,6 +3,8 @@ from modelos import *
 import time
 import pandas as pd
 from Decomposicao_Benders import *
+from GAP_GeracaoDeColunas import *
+
 
 class Controlador:
     def __init__(self, problema, arquivo=None, num=None):
@@ -25,12 +27,41 @@ class Controlador:
 
         elif self.problema == "GapLagrange":
             self.otimiza_Lagrange(arquivo=arquivo)
-
+        
+        elif self.problema == "GeracaoColunasGAP":
+            self.otimiza_GAP_Geracao_Coluna(arquivo=arquivo)
+            
         else:
             print(f'O Problema {problema} está incorreto. '
                   f'Tente: atribuicao_generalizada '
                   f'ou TSP'
                   f'ou Alocacao')
+
+    
+    def otimiza_GAP_Geracao_Coluna(self, arquivo=None, num=None):
+        dados_result = list()
+        leitor = leitor_dados(problema="atribuicao_generalizada")
+        dados = leitor.le_dados_atribuicao_gen()
+        # TODO: testar rodada do modelo!!
+        if arquivo:
+            dados = dados[arquivo]
+            if num:
+                dados = dados[int(num)]
+        dados_consolidados = list()
+        for arq in dados:
+            for prs in dados[arq]:
+                model = GeracaoColunasGAP(dados=dados[arq][prs])
+                #inicio = time.time()
+                resposta = model.otimiza()
+                #fim = time.time() - inicio
+                resposta['problema'] = 'atr_generalizada'
+                resposta['instancia'] = f'{arq} - {prs}'
+                # dict_results[f"{arq} - {prs}"] = resposta
+                resposta['problema'] = 'atr_generalizada'
+                resposta['instancia'] = f'{arq} - {prs}'
+                resposta['tempo'] = 0
+                dados_result.append(copy.deepcopy(resposta))
+        return dados_result
 
     def otimiza_Lagrange(self, arquivo=None, num=None):
         dados_result = list()
@@ -56,7 +87,6 @@ class Controlador:
                 resposta['tempo'] = 0
                 dados_result.append(copy.deepcopy(resposta))
         return dados_result
-
 
     def otimiza_atribuicao_generalizada(self, arquivo=None, num=None):
         dados_result = list()
@@ -177,10 +207,6 @@ class Controlador:
 
         return dados_result
 
-"""
-a = [11, 11, 0, 24, 11, 0, 16, 5, 11, 11, 3, 10, 5, 0, 6, 11, 3, 10, 3, 6, 3, 6, 10, 0, 11, 10, 12, 10, 10, 0, 0, 10, 0, 16, 11, 11, 24, 5, 23, 24, 10, 3, 11, 6, 22, 23, 23, 6, 24, 11]
-array([ 0,  3,  5,  6, 10, 11, 12, 16, 22, 23, 24])
-"""
 
 if __name__ == '__main__':
     #NOME DO PROBLEMA PRECISA SER O MESMO DA PASTA COM AS INSTANCIAS!!
@@ -199,8 +225,12 @@ if __name__ == '__main__':
     # problema = "atribuicao_generalizada"
     # controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()
     #
-    problema  = "GapLagrange"
+    problema  = "GeracaoColunasGAP"
     lagrange = Controlador(problema=problema)
+
+
+    #problema  = "GapLagrange"
+    #lagrange = Controlador(problema=problema)
     # for i in range(len(controle_atr)):
     #     print(f'Exato - Heuristica: {controle_atr[i]["valor_fo"] - lagrange[i]["valor_fo"]}')
 

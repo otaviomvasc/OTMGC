@@ -558,6 +558,16 @@ class EgapLangrange():
             if len(eq_violada) == 0:
                 break
         
+        """
+            Tentativa de heuristica 2:
+            Escolher um Xij qualquer que varia a restrição de capacidade do recurso
+            Calcular a total infeasability
+            Fazer semi atribuição e verificar se diminui a infeasbility total
+            Continuar 
+        
+        """
+        
+        
         print_stats(h, ub, FO_fim, lb, gap, mu, norm)
         for tar in range(self.n_tarefas):
             eq = next(eq for eq in range(self.n_equipes) if Y_ij[eq, tar] > 0)
