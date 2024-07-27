@@ -528,7 +528,14 @@ class EgapLangrange():
             print_stats(h, ub, FO_t, lb, gap, mu, norm)
         print(f"Y ótimo: {[y for y in Y_ij if Y_ij[y] > 0]}")
         print(f"X ótimo: {[x for x in var_x_ij if var_x_ij[x] > 0]}")
-
+        
+        print(f'Capacidades disponiveis:: {self.capacidades}')
+        a = {eq: sum(Y_ij[(eq, j)] * self.consumo_cap[eq][j] for j in range(self.n_tarefas)) for eq in range(self.n_equipes)}
+        print(f'Capacidades utilizadas = {a}')
+        FO_fim = sum([Y_ij[p] * self.custo_alocacao[p[0]][p[1]] for p in product(range(self.n_equipes), range(self.n_tarefas))])
+        print(f'Função Objetivo Calculada por Custo Xij = {FO_fim}')
+        
+    
         h_i = 400
         c = 0
         while h_i > c:
@@ -550,18 +557,13 @@ class EgapLangrange():
             c += 1
             if len(eq_violada) == 0:
                 break
-        FO_fim = sum([Y_ij[p] * self.custo_alocacao[p[0]][p[1]] for p in product(range(self.n_equipes), range(self.n_tarefas))])
+        
         print_stats(h, ub, FO_fim, lb, gap, mu, norm)
         for tar in range(self.n_tarefas):
             eq = next(eq for eq in range(self.n_equipes) if Y_ij[eq, tar] > 0)
             print(f'Tarefa {tar} - Equipe {eq}')
 
-        print(f'Capacidades disponiveis:: {self.capacidades}')
-        a = {eq: sum(Y_ij[(eq, j)] * self.consumo_cap[eq][j] for j in range(self.n_tarefas)) for eq in range(self.n_equipes)}
-        print(f'Capacidades utilizadas = {a}')
-        print(f'Função Objetivo Calculada por Custo Xij = {FO_fim}')
         return {"valor_fo": FO_fim, "tamanho_instacia": 0, "tempo": 0 }
-
 
 
 

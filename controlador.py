@@ -18,7 +18,7 @@ class Controlador:
             self.otimiza_alocacao(arquivo=arquivo)
 
         elif self.problema == 'AlocacaoBENDERS':
-            self.otimiza_Benders(arquivo=arquivo)
+            ...
 
         elif self.problema == "AlocacaoBENDERSBendersBranchAndCut":
             self.otimiza_Benders_BranchAndCut(arquivo=arquivo)
@@ -109,7 +109,7 @@ class Controlador:
 
         return dados_result
 
-    def otimiza_Benders(self, arquivo=None):
+    def otimiza_Benders(self, multicut, inspecao, arquivo=None):
         def cria_matriz_custo_ordenada(d):
             #TODO: SERÁ QUE COMPENSA TRABALHAR COM 2 DICTS AGORA QUE ELES VÃO SER CONSULTADOS E ITERADOS MAIS VEZES PELO BENDERS?
             #TODO: preciso retirar as instâncias com distâncias repetidas!!
@@ -136,7 +136,7 @@ class Controlador:
             inicio = time()
             D_Ordenado, _ = cria_matriz_custo_ordenada(d=dados[instancia])
             dados[instancia]["D_ord"] = D_Ordenado
-            model = Benders(dat=dados[instancia])
+            model = Benders(dat=dados[instancia], multicut=multicut, inspecao=inspecao)
             resposta, fo = model.run()
             tempo_total = time() - inicio
             dados_result.append({"Cenario": instancia, "tempo": tempo_total, "FO": fo})
@@ -181,6 +181,7 @@ class Controlador:
 a = [11, 11, 0, 24, 11, 0, 16, 5, 11, 11, 3, 10, 5, 0, 6, 11, 3, 10, 3, 6, 3, 6, 10, 0, 11, 10, 12, 10, 10, 0, 0, 10, 0, 16, 11, 11, 24, 5, 23, 24, 10, 3, 11, 6, 22, 23, 23, 6, 24, 11]
 array([ 0,  3,  5,  6, 10, 11, 12, 16, 22, 23, 24])
 """
+
 if __name__ == '__main__':
     #NOME DO PROBLEMA PRECISA SER O MESMO DA PASTA COM AS INSTANCIAS!!
     #
@@ -191,16 +192,18 @@ if __name__ == '__main__':
     #num: Cada arquivo de cada problema tem um número de problemas. usar para passar algum especifico!
 
     # problema = "AlocacaoBENDERS"
-    # controle_aloc = Controlador(problema=problema).otimiza_Benders()
-    arquivo = "gap_1.txt"
-    problema = "atribuicao_generalizada"
-    controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()
+    # controle_aloc = Controlador(problema=problema).otimiza_Benders(multicut=False, inspecao=False)
 
+
+    # arquivo = "gap_1.txt"
+    # problema = "atribuicao_generalizada"
+    # controle_atr = Controlador(problema=problema).otimiza_atribuicao_generalizada()
+    #
     problema  = "GapLagrange"
     lagrange = Controlador(problema=problema)
-    for i in range(len(controle_atr)):
-        print(f'Exato - Heuristica: {controle_atr[i]["valor_fo"] - lagrange[i]["valor_fo"]}')
-    b=0
+    # for i in range(len(controle_atr)):
+    #     print(f'Exato - Heuristica: {controle_atr[i]["valor_fo"] - lagrange[i]["valor_fo"]}')
+
     # problema = "AlocacaoBENDERSBendersBranchAndCut"
     # controle_aloc_2 = Controlador(problema=problema).otimiza_Benders_BranchAndCut()
 
